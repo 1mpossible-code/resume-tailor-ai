@@ -2,6 +2,7 @@ services:
   resume-tailor-ai:
     build: .
     container_name: resume-tailor-ai
+    restart: always
     ports:
       - "3000:3000"
     env_file:

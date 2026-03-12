@@ -43,9 +43,6 @@ sentence
 
 - Move the most relevant experience to the top
 
-- Add a strong, tailored summary section at the beginning using job-description
-keywords
-
 - Strengthen achievements using measurable impact when possible
 
 - Make responsibilities match the job description phrasing (without copying
