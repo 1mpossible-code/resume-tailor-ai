@@ -11,7 +11,7 @@
     "cheerio": "^1.2.0",
     "dotenv": "^17.3.1",
     "express": "^4.21.2",
-    "jsonresume-theme-engineering": "^0.7.6",
+    "jsonresume-theme-engineering": "github:1mpossible-code/jsonresume-theme-engineering-internships#main",
     "puppeteer": "^24.22.3",
     "resumed": "^6.1.0"
   },

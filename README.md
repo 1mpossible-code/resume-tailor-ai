@@ -1,6 +1,6 @@
 # Resume Tailor AI
 
-Local web app that tailors your resume to a job description using Gemini, then renders output with `resumed` + `jsonresume-theme-engineering`.
+Local web app that tailors your resume to a job description using Gemini, then renders output with `resumed` + the internships-focused engineering theme from `1mpossible-code/jsonresume-theme-engineering-internships`.
 
 ## Features
 
