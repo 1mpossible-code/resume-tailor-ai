@@ -1,0 +1,10 @@
+services:
+  resume-tailor-ai:
+    build: .
+    container_name: resume-tailor-ai
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - ./outputs:/app/outputs

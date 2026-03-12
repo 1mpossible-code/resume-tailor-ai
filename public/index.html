@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resume Tailor AI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="panel input-panel">
+        <h1>Resume Tailor AI</h1>
+        <p class="subtitle">Use a job link or description, then generate a tailored resume from your locally saved base resume.</p>
+
+        <label for="jobUrl">Job posting link (recommended)</label>
+        <div class="link-row">
+          <input
+            id="jobUrl"
+            name="jobUrl"
+            type="url"
+            placeholder="https://company.com/jobs/software-engineer"
+          />
+          <button id="extractBtn" class="btn secondary">Extract From Link</button>
+        </div>
+
+        <label for="jobDescription">Job description</label>
+        <textarea
+          id="jobDescription"
+          name="jobDescription"
+          placeholder="Paste the full job description here..."
+        ></textarea>
+
+        <div class="actions">
+          <button id="generateBtn" class="btn primary">Generate Resume</button>
+          <button id="clearHistoryBtn" class="btn ghost">Clear History</button>
+        </div>
+
+        <p id="status" class="status"></p>
+      </section>
+
+      <section class="panel output-panel">
+        <div class="output-head">
+          <h2>Result</h2>
+          <div class="actions">
+            <button id="copyJsonBtn" class="btn secondary" disabled>Copy JSON</button>
+            <a id="downloadPdfBtn" class="btn secondary disabled" href="#" download>Download PDF</a>
+          </div>
+        </div>
+        <iframe id="previewFrame" title="Resume preview"></iframe>
+      </section>
+
+      <section class="panel resume-panel">
+        <div class="output-head">
+          <h2>Base Resume (Local Browser Save)</h2>
+          <div class="actions">
+            <button id="saveResumeBtn" class="btn secondary">Save Resume</button>
+            <button id="formatResumeBtn" class="btn secondary">Format JSON</button>
+            <button id="copyResumeBtn" class="btn secondary">Copy Resume JSON</button>
+            <button id="importResumeBtn" class="btn secondary">Import JSON</button>
+            <button id="exportResumeBtn" class="btn secondary">Export JSON</button>
+          </div>
+        </div>
+        <p class="subtitle compact">Stored in this browser's localStorage. Used for every generation request.</p>
+        <textarea id="resumeJson" name="resumeJson" placeholder="Paste JSON Resume here..."></textarea>
+        <input id="importResumeFile" type="file" accept="application/json,.json" hidden />
+      </section>
+
+      <section class="panel history-panel">
+        <div class="output-head">
+          <h2>Last 5 Resumes</h2>
+        </div>
+        <ul id="historyList"></ul>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

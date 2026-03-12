@@ -1,0 +1,21 @@
+{
+  "name": "resume-tailor-ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.3.1",
+    "express": "^4.21.2",
+    "jsonresume-theme-engineering": "^0.7.6",
+    "puppeteer": "^24.22.3",
+    "resumed": "^6.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
