@@ -64,7 +64,13 @@ A fully rewritten, ATS-optimized, job-description-matched resume.
 
 Keep it concise, professional, and keyword-rich.
 
-Feel free to shuffle the bullets and experiences in the good order.
+6. Preserve chronology strictly:
+
+- Keep roles in reverse-chronological order (most recent to oldest)
+
+- For each role, preserve bullet order as originally written
+
+- You may rewrite bullet wording for clarity and impact, but do NOT reorder bullets or move achievements across roles
 
 Here is resume:
 
