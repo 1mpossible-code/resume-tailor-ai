@@ -21,11 +21,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
+const historyLimit = Number(process.env.HISTORY_LIMIT || 20);
 
 const promptPath = path.join(__dirname, "prompt.txt");
 const outputDir = path.join(__dirname, "outputs");
 const historyPath = path.join(outputDir, "history.json");
-const maxHistory = 5;
+const maxHistory = Number.isInteger(historyLimit) && historyLimit > 0 ? historyLimit : 20;
 
 const resumedBin = path.join(
   __dirname,

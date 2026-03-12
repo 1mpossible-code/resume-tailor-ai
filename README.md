@@ -13,7 +13,7 @@ Local web app that tailors your resume to a job description using Gemini, then r
 - Rendered HTML preview
 - One-click JSON copy button
 - One-click PDF download button
-- Keeps only the last 5 generated resumes in history
+- Keeps only the latest 20 generated resumes in history by default
 - Docker-ready setup
 - If PDF export fails, HTML preview still returns
 
@@ -72,6 +72,7 @@ If you are on Apple Silicon, this image now uses system Chromium inside the cont
 - `AI_MODEL`: defaults to `gemini-2.5-flash`
 - `GEMINI_API_KEY`: required for Gemini calls
 - `PORT`: defaults to `3000`
+- `HISTORY_LIMIT`: defaults to `20`
 
 ## Notes
 
@@ -79,4 +80,4 @@ If you are on Apple Silicon, this image now uses system Chromium inside the cont
 - You must save or import your resume JSON in the editor before generating.
 - Prompt template source is always `prompt.txt`.
 - Generated files are written to `outputs/`.
-- History list is tracked in `outputs/history.json` and auto-pruned to 5 items.
+- History list is tracked in `outputs/history.json` and auto-pruned to `HISTORY_LIMIT` items.
