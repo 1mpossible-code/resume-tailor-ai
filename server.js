@@ -217,6 +217,18 @@ function buildRenderResume(resume, disabledSections) {
   return copy;
 }
 
+function restoreMissingArraySectionsFromBase(baseResume, tailoredResume) {
+  const arraySections = supportedSectionConfigs
+    .filter((section) => section.type === "array")
+    .map((section) => section.key);
+
+  for (const section of arraySections) {
+    if (!Array.isArray(tailoredResume?.[section]) && Array.isArray(baseResume?.[section])) {
+      tailoredResume[section] = structuredClone(baseResume[section]);
+    }
+  }
+}
+
 function buildPrompt(template, resumeObj, jobDescription) {
   const resumeJson = JSON.stringify(resumeObj, null, 2);
   let prompt = template
@@ -675,6 +687,7 @@ app.post("/api/generate", async (req, res) => {
       resume: baseResume,
       jobDescription
     });
+    restoreMissingArraySectionsFromBase(baseResume, tailoredResume);
     normalizeResumeDates(tailoredResume);
     validateResumeShape(tailoredResume);
 

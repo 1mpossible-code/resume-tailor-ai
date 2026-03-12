@@ -72,6 +72,14 @@ Keep it concise, professional, and keyword-rich.
 
 - You may rewrite bullet wording for clarity and impact, but do NOT reorder bullets or move achievements across roles
 
+7. Preserve section structure from the input resume:
+
+- Keep every top-level section that exists in the input JSON (for example: projects, volunteer, awards, publications, certificates, interests, languages, references)
+
+- Do not remove a section key that already exists in the input
+
+- If a section has no relevant updates, keep its original entries instead of deleting it
+
 Here is resume:
 
 [[resume]]
