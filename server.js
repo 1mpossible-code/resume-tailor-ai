@@ -139,6 +139,84 @@ function normalizeResumeDates(resume) {
   }
 }
 
+const supportedSectionConfigs = [
+  { key: "summary", type: "summary" },
+  { key: "work", type: "array" },
+  { key: "education", type: "array" },
+  { key: "skills", type: "array" },
+  { key: "volunteer", type: "array" },
+  { key: "awards", type: "array" },
+  { key: "projects", type: "array" },
+  { key: "publications", type: "array" },
+  { key: "certificates", type: "array" },
+  { key: "interests", type: "array" },
+  { key: "languages", type: "array" },
+  { key: "references", type: "array" }
+];
+
+function analyzeSectionControls(resume) {
+  const availableSections = [];
+  const sectionPresence = {};
+
+  for (const section of supportedSectionConfigs) {
+    let hasKey = false;
+    let hasContent = false;
+
+    if (section.type === "summary") {
+      hasKey = isPlainObject(resume?.basics) && "summary" in resume.basics;
+      hasContent = Boolean(resume?.basics?.summary && String(resume.basics.summary).trim());
+    } else {
+      hasKey = Array.isArray(resume?.[section.key]);
+      hasContent = hasKey && resume[section.key].length > 0;
+    }
+
+    if (hasKey) {
+      availableSections.push(section.key);
+    }
+
+    sectionPresence[section.key] = hasContent;
+  }
+
+  return { availableSections, sectionPresence };
+}
+
+function normalizeDisabledSections(disabledSections, availableSections) {
+  if (!Array.isArray(disabledSections)) {
+    return [];
+  }
+
+  const availableSet = new Set(availableSections);
+  const normalized = new Set();
+  for (const section of disabledSections) {
+    if (typeof section === "string" && availableSet.has(section)) {
+      normalized.add(section);
+    }
+  }
+
+  return Array.from(normalized);
+}
+
+function buildRenderResume(resume, disabledSections) {
+  const copy = structuredClone(resume);
+  const disabledSet = new Set(disabledSections);
+
+  if (disabledSet.has("summary") && isPlainObject(copy.basics)) {
+    copy.basics.summary = "";
+  }
+
+  const arraySections = supportedSectionConfigs
+    .filter((section) => section.type === "array")
+    .map((section) => section.key);
+
+  for (const section of arraySections) {
+    if (disabledSet.has(section) && Array.isArray(copy[section])) {
+      copy[section] = [];
+    }
+  }
+
+  return copy;
+}
+
 function buildPrompt(template, resumeObj, jobDescription) {
   const resumeJson = JSON.stringify(resumeObj, null, 2);
   let prompt = template
@@ -321,6 +399,45 @@ async function runResumed(args) {
   }
 }
 
+async function renderOutputsFromResume({ resume, id }) {
+  const sourceJsonPath = path.join(outputDir, `${id}.render.json`);
+  const htmlPath = path.join(outputDir, `${id}.html`);
+  const pdfPath = path.join(outputDir, `${id}.pdf`);
+
+  await writeFile(sourceJsonPath, JSON.stringify(resume, null, 2), "utf8");
+
+  await runResumed([
+    "render",
+    sourceJsonPath,
+    "--theme",
+    "jsonresume-theme-engineering",
+    "--output",
+    htmlPath
+  ]);
+
+  let hasPdf = false;
+  let warning = null;
+  try {
+    await runResumed([
+      "export",
+      sourceJsonPath,
+      "--theme",
+      "jsonresume-theme-engineering",
+      "--output",
+      pdfPath,
+      "--puppeteer-arg=--no-sandbox",
+      "--puppeteer-arg=--disable-setuid-sandbox"
+    ]);
+    hasPdf = true;
+  } catch (error) {
+    warning = `PDF export failed, but HTML preview is ready. ${error.message}`;
+  }
+
+  await unlink(sourceJsonPath).catch(() => {});
+
+  return { htmlPath, pdfPath, hasPdf, warning };
+}
+
 async function ensureStorage() {
   await mkdir(outputDir, { recursive: true });
   try {
@@ -344,11 +461,20 @@ async function writeHistory(items) {
 async function deleteEntryFiles(entry) {
   const candidates = [entry?.jsonPath, entry?.htmlPath, entry?.pdfPath];
   for (const filePath of candidates) {
-    if (!filePath) {
+    const resolvedPath = resolveOutputPath(filePath);
+    if (!resolvedPath) {
       continue;
     }
-    await unlink(filePath).catch(() => {});
+    await unlink(resolvedPath).catch(() => {});
   }
+}
+
+function resolveOutputPath(storedPath) {
+  if (!storedPath || typeof storedPath !== "string") {
+    return null;
+  }
+
+  return path.join(outputDir, path.basename(storedPath));
 }
 
 function makeEntryResponse(entry) {
@@ -361,11 +487,46 @@ function makeEntryResponse(entry) {
     htmlUrl: `/outputs/${entry.id}.html`,
     strictResumeName: entry.strictResumeName,
     fileBaseName: entry.fileBaseName,
+    availableSections: Array.isArray(entry.availableSections) ? entry.availableSections : [],
+    disabledSections: Array.isArray(entry.disabledSections) ? entry.disabledSections : [],
+    sectionPresence: isPlainObject(entry.sectionPresence) ? entry.sectionPresence : {},
     hasPdf: Boolean(entry.hasPdf),
     pdfUrl: entry.hasPdf ? `/outputs/${entry.id}.pdf` : null,
     jsonUrl: `/api/history/${entry.id}/json`,
     warning: entry.warning || null
   };
+}
+
+async function hydrateEntrySections(entry) {
+  const jsonPath = resolveOutputPath(entry.jsonPath);
+  if (!jsonPath) {
+    return {
+      ...entry,
+      availableSections: [],
+      sectionPresence: {}
+    };
+  }
+
+  try {
+    const raw = await readFile(jsonPath, "utf8");
+    const resume = JSON.parse(raw);
+    const analysis = analyzeSectionControls(resume);
+    return {
+      ...entry,
+      availableSections: analysis.availableSections,
+      sectionPresence: analysis.sectionPresence,
+      disabledSections: normalizeDisabledSections(
+        entry.disabledSections,
+        analysis.availableSections
+      )
+    };
+  } catch {
+    return {
+      ...entry,
+      availableSections: [],
+      sectionPresence: {}
+    };
+  }
 }
 
 app.get("/api/health", (_req, res) => {
@@ -390,7 +551,9 @@ app.post("/api/extract-job", async (req, res) => {
 
 app.get("/api/history", async (_req, res) => {
   const history = await readHistory();
-  res.json({ items: history.map(makeEntryResponse) });
+  const hydratedHistory = await Promise.all(history.map(hydrateEntrySections));
+  await writeHistory(hydratedHistory);
+  res.json({ items: hydratedHistory.map(makeEntryResponse) });
 });
 
 app.get("/api/history/:id/json", async (req, res) => {
@@ -401,8 +564,66 @@ app.get("/api/history/:id/json", async (req, res) => {
     return;
   }
 
-  const jsonText = await readFile(entry.jsonPath, "utf8");
+  const jsonPath = resolveOutputPath(entry.jsonPath);
+  if (!jsonPath) {
+    res.status(404).json({ error: "History JSON is unavailable" });
+    return;
+  }
+
+  const jsonText = await readFile(jsonPath, "utf8");
   res.type("application/json").send(jsonText);
+});
+
+app.post("/api/history/:id/render", async (req, res) => {
+  try {
+    const history = await readHistory();
+    const index = history.findIndex((item) => item.id === req.params.id);
+    if (index === -1) {
+      res.status(404).json({ error: "History item not found" });
+      return;
+    }
+
+    const entry = history[index];
+    const jsonPath = resolveOutputPath(entry.jsonPath);
+    if (!jsonPath) {
+      res.status(404).json({ error: "History JSON is unavailable" });
+      return;
+    }
+
+    const rawJson = await readFile(jsonPath, "utf8");
+    const tailoredResume = JSON.parse(rawJson);
+    normalizeResumeDates(tailoredResume);
+
+    const analysis = analyzeSectionControls(tailoredResume);
+    const availableSections = analysis.availableSections;
+    const disabledSections = normalizeDisabledSections(req.body?.disabledSections, availableSections);
+    const renderResume = buildRenderResume(tailoredResume, disabledSections);
+
+    const renderResult = await renderOutputsFromResume({
+      resume: renderResume,
+      id: entry.id
+    });
+
+    const updatedEntry = {
+      ...entry,
+      availableSections,
+      sectionPresence: analysis.sectionPresence,
+      disabledSections,
+      htmlPath: path.basename(renderResult.htmlPath),
+      pdfPath: path.basename(renderResult.pdfPath),
+      hasPdf: renderResult.hasPdf,
+      warning: renderResult.warning
+    };
+
+    history[index] = updatedEntry;
+    await writeHistory(history);
+
+    res.json({ item: makeEntryResponse(updatedEntry) });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message || "Failed to re-render resume"
+    });
+  }
 });
 
 app.post("/api/generate", async (req, res) => {
@@ -457,6 +678,11 @@ app.post("/api/generate", async (req, res) => {
     normalizeResumeDates(tailoredResume);
     validateResumeShape(tailoredResume);
 
+    const analysis = analyzeSectionControls(tailoredResume);
+    const availableSections = analysis.availableSections;
+    const disabledSections = normalizeDisabledSections(req.body?.disabledSections, availableSections);
+    const renderResume = buildRenderResume(tailoredResume, disabledSections);
+
     const { strictResumeName, fileBaseName } = await buildResumeName({
       provider,
       jobDescription,
@@ -467,37 +693,12 @@ app.post("/api/generate", async (req, res) => {
     await ensureStorage();
     const id = `${Date.now()}`;
     const jsonPath = path.join(outputDir, `${id}.json`);
-    const htmlPath = path.join(outputDir, `${id}.html`);
-    const pdfPath = path.join(outputDir, `${id}.pdf`);
 
     await writeFile(jsonPath, JSON.stringify(tailoredResume, null, 2), "utf8");
-
-    await runResumed([
-      "render",
-      jsonPath,
-      "--theme",
-      "jsonresume-theme-engineering",
-      "--output",
-      htmlPath
-    ]);
-
-    let hasPdf = false;
-    let warning = null;
-    try {
-      await runResumed([
-        "export",
-        jsonPath,
-        "--theme",
-        "jsonresume-theme-engineering",
-        "--output",
-        pdfPath,
-        "--puppeteer-arg=--no-sandbox",
-        "--puppeteer-arg=--disable-setuid-sandbox"
-      ]);
-      hasPdf = true;
-    } catch (error) {
-      warning = `PDF export failed, but HTML preview is ready. ${error.message}`;
-    }
+    const renderResult = await renderOutputsFromResume({
+      resume: renderResume,
+      id
+    });
 
     const history = await readHistory();
     const entry = {
@@ -508,11 +709,14 @@ app.post("/api/generate", async (req, res) => {
       jobDescriptionPreview: jobDescription.slice(0, 140),
       strictResumeName,
       fileBaseName,
-      jsonPath,
-      htmlPath,
-      pdfPath,
-      hasPdf,
-      warning
+      availableSections,
+      sectionPresence: analysis.sectionPresence,
+      disabledSections,
+      jsonPath: path.basename(jsonPath),
+      htmlPath: path.basename(renderResult.htmlPath),
+      pdfPath: path.basename(renderResult.pdfPath),
+      hasPdf: renderResult.hasPdf,
+      warning: renderResult.warning
     };
 
     const nextHistory = [entry, ...history];

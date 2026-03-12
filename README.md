@@ -13,6 +13,7 @@ Local web app that tailors your resume to a job description using Gemini, then r
 - Rendered HTML preview
 - One-click JSON copy button
 - One-click PDF download button
+- Section toggles for PDF/preview layout (with local default preferences)
 - Keeps only the latest 20 generated resumes in history by default
 - Docker-ready setup
 - If PDF export fails, HTML preview still returns
@@ -81,3 +82,4 @@ If you are on Apple Silicon, this image now uses system Chromium inside the cont
 - Prompt template source is always `prompt.txt`.
 - Generated files are written to `outputs/`.
 - History list is tracked in `outputs/history.json` and auto-pruned to `HISTORY_LIMIT` items.
+- Section layout defaults are empty (no sections disabled) and can be customized per browser via localStorage.

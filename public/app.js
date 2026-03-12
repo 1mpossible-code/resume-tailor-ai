@@ -12,11 +12,31 @@ const importResumeBtn = document.getElementById("importResumeBtn");
 const exportResumeBtn = document.getElementById("exportResumeBtn");
 const copyJsonBtn = document.getElementById("copyJsonBtn");
 const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+const applySectionsBtn = document.getElementById("applySectionsBtn");
+const saveSectionPrefsBtn = document.getElementById("saveSectionPrefsBtn");
+const resetSectionPrefsBtn = document.getElementById("resetSectionPrefsBtn");
+const sectionToggles = document.getElementById("sectionToggles");
 const previewFrame = document.getElementById("previewFrame");
 const historyList = document.getElementById("historyList");
 const statusEl = document.getElementById("status");
 
 const localStorageResumeKey = "resumeTailor.baseResume";
+const localStorageSectionPrefsKey = "resumeTailor.sectionPrefs";
+
+const sectionLabels = {
+  summary: "Summary",
+  work: "Work",
+  education: "Education",
+  skills: "Skills",
+  awards: "Awards",
+  volunteer: "Volunteer",
+  projects: "Projects",
+  publications: "Publications",
+  certificates: "Certificates",
+  interests: "Interests",
+  languages: "Languages",
+  references: "References"
+};
 
 let selectedItem = null;
 
@@ -53,6 +73,94 @@ function setLoading(isLoading) {
 function setExtractLoading(isLoading) {
   extractBtn.disabled = isLoading;
   extractBtn.textContent = isLoading ? "Extracting..." : "Extract From Link";
+}
+
+function defaultSectionPrefs() {
+  return { disabledSections: [] };
+}
+
+function readSectionPrefs() {
+  const raw = localStorage.getItem(localStorageSectionPrefsKey);
+  if (!raw) {
+    return defaultSectionPrefs();
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.disabledSections)) {
+      return defaultSectionPrefs();
+    }
+
+    return {
+      disabledSections: parsed.disabledSections.filter((item) => typeof item === "string")
+    };
+  } catch {
+    return defaultSectionPrefs();
+  }
+}
+
+function writeSectionPrefs(disabledSections) {
+  localStorage.setItem(
+    localStorageSectionPrefsKey,
+    JSON.stringify({ disabledSections: Array.from(new Set(disabledSections)) })
+  );
+}
+
+function disabledSectionsFromPrefsForAvailable(availableSections) {
+  const prefs = readSectionPrefs();
+  const availableSet = new Set(availableSections || []);
+  return prefs.disabledSections.filter((section) => availableSet.has(section));
+}
+
+function getDisabledSectionsFromControls() {
+  const disabled = [];
+  const checkboxes = sectionToggles.querySelectorAll('input[type="checkbox"][data-section]');
+  for (const checkbox of checkboxes) {
+    if (!checkbox.checked) {
+      disabled.push(checkbox.dataset.section);
+    }
+  }
+  return disabled;
+}
+
+function updateSectionButtonsState(hasSelection) {
+  applySectionsBtn.disabled = !hasSelection;
+  saveSectionPrefsBtn.disabled = !hasSelection;
+  resetSectionPrefsBtn.disabled = !hasSelection;
+}
+
+function renderSectionControls(item) {
+  sectionToggles.innerHTML = "";
+  if (!item || !Array.isArray(item.availableSections) || item.availableSections.length === 0) {
+    updateSectionButtonsState(false);
+    const empty = document.createElement("div");
+    empty.className = "history-date";
+    empty.textContent = "No optional sections found for this resume.";
+    sectionToggles.appendChild(empty);
+    return;
+  }
+
+  const disabledSet = new Set(item.disabledSections || []);
+  for (const section of item.availableSections) {
+    const label = document.createElement("label");
+    label.className = "section-toggle";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.section = section;
+    checkbox.checked = !disabledSet.has(section);
+
+    const text = document.createElement("span");
+    const hasContent = Boolean(item.sectionPresence && item.sectionPresence[section]);
+    text.textContent = hasContent
+      ? sectionLabels[section] || section
+      : `${sectionLabels[section] || section} (empty)`;
+
+    label.append(checkbox, text);
+    sectionToggles.appendChild(label);
+  }
+
+  updateSectionButtonsState(true);
 }
 
 function parseResumeEditorText() {
@@ -112,6 +220,7 @@ function setSelectedItem(item) {
     downloadPdfBtn.classList.add("disabled");
     downloadPdfBtn.href = "#";
     previewFrame.src = "about:blank";
+    renderSectionControls(null);
     return;
   }
 
@@ -126,6 +235,7 @@ function setSelectedItem(item) {
     downloadPdfBtn.removeAttribute("download");
   }
   previewFrame.src = item.htmlUrl;
+  renderSectionControls(item);
 }
 
 async function loadHistory() {
@@ -178,7 +288,20 @@ async function loadHistory() {
     historyList.appendChild(li);
   }
 
-  if (!selectedItem && items.length > 0) {
+  if (items.length === 0) {
+    setSelectedItem(null);
+    return;
+  }
+
+  if (!selectedItem) {
+    setSelectedItem(items[0]);
+    return;
+  }
+
+  const refreshedSelection = items.find((item) => item.id === selectedItem.id);
+  if (refreshedSelection) {
+    setSelectedItem(refreshedSelection);
+  } else {
     setSelectedItem(items[0]);
   }
 }
@@ -204,10 +327,19 @@ async function generateResume() {
     setLoading(true);
     setStatus("Generating tailored resume...");
 
+    const defaultDisabledSections = disabledSectionsFromPrefsForAvailable(
+      Object.keys(sectionLabels)
+    );
+
     const response = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobDescription, jobUrl, resumeJson })
+      body: JSON.stringify({
+        jobDescription,
+        jobUrl,
+        resumeJson,
+        disabledSections: defaultDisabledSections
+      })
     });
 
     const data = await response.json();
@@ -345,6 +477,72 @@ async function importBaseResumeFile(event) {
   }
 }
 
+async function applySectionLayout() {
+  if (!selectedItem) {
+    return;
+  }
+
+  try {
+    setStatus("Applying section layout...");
+    applySectionsBtn.disabled = true;
+
+    const disabledSections = getDisabledSectionsFromControls();
+    const response = await fetch(`/api/history/${selectedItem.id}/render`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ disabledSections })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to apply section layout");
+    }
+
+    setSelectedItem(data.item);
+    if (data.item.warning) {
+      setStatus(data.item.warning, true);
+    } else {
+      setStatus("Section layout updated for preview and PDF.");
+    }
+    await loadHistory();
+  } catch (error) {
+    setStatus(error.message || "Failed to apply section layout", true);
+  } finally {
+    applySectionsBtn.disabled = false;
+  }
+}
+
+function saveCurrentSectionPrefs() {
+  if (!selectedItem) {
+    return;
+  }
+
+  const disabledSections = getDisabledSectionsFromControls();
+  writeSectionPrefs(disabledSections);
+  setStatus("Section preferences saved as default.");
+}
+
+function resetSectionPrefs() {
+  if (!selectedItem) {
+    return;
+  }
+
+  const defaults = defaultSectionPrefs();
+  writeSectionPrefs(defaults.disabledSections);
+
+  const availableSet = new Set(selectedItem.availableSections || []);
+  const defaultSet = new Set(
+    defaults.disabledSections.filter((section) => availableSet.has(section))
+  );
+
+  const checkboxes = sectionToggles.querySelectorAll('input[type="checkbox"][data-section]');
+  for (const checkbox of checkboxes) {
+    checkbox.checked = !defaultSet.has(checkbox.dataset.section);
+  }
+
+  setStatus("Default section preferences restored. Click Apply Layout to use now.");
+}
+
 async function clearHistory() {
   try {
     const response = await fetch("/api/history", { method: "DELETE" });
@@ -368,10 +566,14 @@ saveResumeBtn.addEventListener("click", saveResume);
 formatResumeBtn.addEventListener("click", formatResume);
 copyResumeBtn.addEventListener("click", copyBaseResume);
 exportResumeBtn.addEventListener("click", exportBaseResume);
+applySectionsBtn.addEventListener("click", applySectionLayout);
+saveSectionPrefsBtn.addEventListener("click", saveCurrentSectionPrefs);
+resetSectionPrefsBtn.addEventListener("click", resetSectionPrefs);
 importResumeBtn.addEventListener("click", () => importResumeFileInput.click());
 importResumeFileInput.addEventListener("change", importBaseResumeFile);
 
 initializeResumeEditor();
+renderSectionControls(null);
 loadHistory().catch(() => {
   setStatus("Could not load history.", true);
 });

@@ -171,6 +171,51 @@ input[type="url"] {
   margin-bottom: 10px;
 }
 
+.section-controls {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fbfcff;
+}
+
+.section-controls-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.section-controls h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.compact-actions {
+  margin-top: 0;
+}
+
+.section-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+}
+
+.section-toggle input {
+  margin: 0;
+}
+
 #previewFrame {
   width: 100%;
   flex: 1;
@@ -234,5 +279,10 @@ input[type="url"] {
 
   .link-row {
     grid-template-columns: 1fr;
+  }
+
+  .section-controls-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

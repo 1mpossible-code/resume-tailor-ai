@@ -46,6 +46,17 @@
             <a id="downloadPdfBtn" class="btn secondary disabled" href="#" download>Download PDF</a>
           </div>
         </div>
+        <div class="section-controls" aria-live="polite">
+          <div class="section-controls-head">
+            <h3>PDF Section Controls</h3>
+            <div class="actions compact-actions">
+              <button id="applySectionsBtn" class="btn secondary" disabled>Apply Layout</button>
+              <button id="saveSectionPrefsBtn" class="btn secondary" disabled>Save As Default</button>
+              <button id="resetSectionPrefsBtn" class="btn secondary" disabled>Reset Defaults</button>
+            </div>
+          </div>
+          <div id="sectionToggles" class="section-toggle-grid"></div>
+        </div>
         <iframe id="previewFrame" title="Resume preview"></iframe>
       </section>
 
