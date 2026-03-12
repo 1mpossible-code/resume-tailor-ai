@@ -17,7 +17,7 @@ function extractJsonText(rawText) {
 }
 
 export class GeminiProvider extends AIProvider {
-  async generateTailoredResume({ prompt }) {
+  async callGemini({ prompt, responseMimeType = "application/json" }) {
     const apiKey = this.config.apiKey;
     const model = this.config.model || "gemini-2.5-flash";
 
@@ -35,7 +35,7 @@ export class GeminiProvider extends AIProvider {
           generationConfig: {
             temperature: 0.2,
             topP: 0.9,
-            responseMimeType: "application/json"
+            responseMimeType
           }
         })
       }
@@ -58,7 +58,35 @@ export class GeminiProvider extends AIProvider {
       throw new Error("Gemini response text was empty");
     }
 
+    return text;
+  }
+
+  async generateTailoredResume({ prompt }) {
+    const text = await this.callGemini({ prompt, responseMimeType: "application/json" });
+
     const jsonText = extractJsonText(text);
     return JSON.parse(jsonText);
+  }
+
+  async extractJobTarget({ jobDescription }) {
+    const prompt = [
+      "Extract company and position from this job description.",
+      "Return strict JSON with exactly these keys:",
+      '{"company":"...","position":"..."}',
+      "Rules:",
+      "- If missing, use empty string",
+      "- No extra keys",
+      "- Keep concise values",
+      "Job description:",
+      jobDescription
+    ].join("\n");
+
+    const text = await this.callGemini({ prompt, responseMimeType: "application/json" });
+    const parsed = JSON.parse(extractJsonText(text));
+
+    return {
+      company: typeof parsed.company === "string" ? parsed.company.trim() : "",
+      position: typeof parsed.position === "string" ? parsed.position.trim() : ""
+    };
   }
 }

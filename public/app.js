@@ -119,7 +119,7 @@ function setSelectedItem(item) {
   if (item.hasPdf && item.pdfUrl) {
     downloadPdfBtn.classList.remove("disabled");
     downloadPdfBtn.href = item.pdfUrl;
-    downloadPdfBtn.download = `tailored-resume-${item.id}.pdf`;
+    downloadPdfBtn.download = `${item.fileBaseName || `tailored-resume-${item.id}`}.pdf`;
   } else {
     downloadPdfBtn.classList.add("disabled");
     downloadPdfBtn.href = "#";
@@ -142,7 +142,7 @@ async function loadHistory() {
 
     const preview = document.createElement("div");
     preview.className = "history-preview";
-    preview.textContent = item.jobDescriptionPreview || "No job description preview";
+    preview.textContent = item.strictResumeName || item.jobDescriptionPreview || "No job description preview";
 
     const date = document.createElement("div");
     date.className = "history-date";
@@ -165,7 +165,7 @@ async function loadHistory() {
     pdfLink.className = "btn secondary";
     if (item.hasPdf && item.pdfUrl) {
       pdfLink.href = item.pdfUrl;
-      pdfLink.download = `tailored-resume-${item.id}.pdf`;
+      pdfLink.download = `${item.fileBaseName || `tailored-resume-${item.id}`}.pdf`;
       pdfLink.textContent = "PDF";
     } else {
       pdfLink.href = "#";

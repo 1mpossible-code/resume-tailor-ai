@@ -169,6 +169,94 @@ function normalizeWhitespace(text) {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function toSafeNamePart(value, fallback = "Unknown") {
+  const cleaned = String(value || "")
+    .replace(/[\\/:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return cleaned || fallback;
+}
+
+function toFileBaseName(value) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+}
+
+function fallbackCompanyFromUrl(rawJobUrl) {
+  if (!rawJobUrl) {
+    return "";
+  }
+
+  try {
+    const host = new URL(rawJobUrl).hostname.replace(/^www\./, "");
+    const firstPart = host.split(".")[0] || "";
+    if (!firstPart) {
+      return "";
+    }
+    return firstPart.charAt(0).toUpperCase() + firstPart.slice(1);
+  } catch {
+    return "";
+  }
+}
+
+function fallbackPositionFromDescription(jobDescription) {
+  const firstLines = jobDescription
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+
+  const rolePattern = /(staff|senior|lead|principal|junior)?\s*(software|backend|frontend|full[- ]?stack|data|machine learning|ml|devops|platform|site reliability|security)?\s*(engineer|developer|scientist|manager|architect)/i;
+
+  for (const line of firstLines) {
+    const match = line.match(rolePattern);
+    if (match) {
+      return line.length <= 90 ? line : match[0];
+    }
+  }
+
+  return "";
+}
+
+async function buildResumeName({ provider, jobDescription, rawJobUrl, resumeName }) {
+  let company = "";
+  let position = "";
+
+  if (provider && typeof provider.extractJobTarget === "function") {
+    try {
+      const extracted = await provider.extractJobTarget({ jobDescription });
+      if (isPlainObject(extracted)) {
+        company = String(extracted.company || "").trim();
+        position = String(extracted.position || "").trim();
+      }
+    } catch {
+      // Fallbacks below handle extraction failures.
+    }
+  }
+
+  if (!company) {
+    company = fallbackCompanyFromUrl(rawJobUrl);
+  }
+
+  if (!position) {
+    position = fallbackPositionFromDescription(jobDescription);
+  }
+
+  const safeName = toSafeNamePart(resumeName, "Candidate");
+  const safeCompany = toSafeNamePart(company, "Unknown Company");
+  const safePosition = toSafeNamePart(position, "Unknown Position");
+
+  const strictResumeName = `${safeName} - ${safeCompany} - ${safePosition}`;
+  return {
+    strictResumeName,
+    fileBaseName: toFileBaseName(strictResumeName)
+  };
+}
+
 function extractJobDescriptionFromHtml(html) {
   const $ = cheerio.load(html);
   $("script, style, noscript, svg").remove();
@@ -270,6 +358,8 @@ function makeEntryResponse(entry) {
     model: entry.model,
     jobDescriptionPreview: entry.jobDescriptionPreview,
     htmlUrl: `/outputs/${entry.id}.html`,
+    strictResumeName: entry.strictResumeName,
+    fileBaseName: entry.fileBaseName,
     hasPdf: Boolean(entry.hasPdf),
     pdfUrl: entry.hasPdf ? `/outputs/${entry.id}.pdf` : null,
     jsonUrl: `/api/history/${entry.id}/json`,
@@ -366,6 +456,13 @@ app.post("/api/generate", async (req, res) => {
     normalizeResumeDates(tailoredResume);
     validateResumeShape(tailoredResume);
 
+    const { strictResumeName, fileBaseName } = await buildResumeName({
+      provider,
+      jobDescription,
+      rawJobUrl,
+      resumeName: tailoredResume?.basics?.name || baseResume?.basics?.name || "Candidate"
+    });
+
     await ensureStorage();
     const id = `${Date.now()}`;
     const jsonPath = path.join(outputDir, `${id}.json`);
@@ -408,6 +505,8 @@ app.post("/api/generate", async (req, res) => {
       provider: providerName,
       model,
       jobDescriptionPreview: jobDescription.slice(0, 140),
+      strictResumeName,
+      fileBaseName,
       jsonPath,
       htmlPath,
       pdfPath,
